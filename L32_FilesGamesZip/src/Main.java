@@ -1,11 +1,13 @@
 import java.io.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 public class Main {
-    private static final String BASE_PATH = "./Games/";
-    private static final String SAVE_PATH = BASE_PATH + "savegames";
+    private static final String BASE_PATH = "./Games";
+    private static final String SAVE_PATH = BASE_PATH + "/savegames";
 
     public static void main(String[] args) {
         List<Pair<File, GameProgress>> gameProgresses = List.of(
@@ -27,8 +29,16 @@ public class Main {
         File zipFile = new File(SAVE_PATH, "out.zip");
         zipFiles(zipFile, gameProgresses.stream().map(Pair::key).toList());
 
-        gameProgresses.forEach((gamePair) -> gamePair.key().delete());
-        System.out.println("Done!");
+        gameProgresses.forEach(gamePair -> gamePair.key().delete());
+        System.out.println("Zip done!");
+
+        File unzipDir = new File(SAVE_PATH + "/unzipped");
+        unzipDir.mkdirs();
+        openZip(zipFile, unzipDir)
+                .stream()
+                .map(Main::openProgress)
+                .forEach(System.out::println);
+        System.out.println("Unzip done!");
     }
 
     private static void saveGame(Pair<File, GameProgress> gameData) {
@@ -39,7 +49,6 @@ public class Main {
 
         } catch (IOException e) {
             System.out.println(e.getMessage());
-            ;
         }
     }
 
@@ -60,5 +69,43 @@ public class Main {
         } catch (IOException e) {
             System.out.println(e.getMessage());
         }
+    }
+
+    private static List<File> openZip(File zipFile, File outDir) {
+        List<File> unzipped = new ArrayList<>();
+        try (
+                FileInputStream inZip = new FileInputStream(zipFile);
+                ZipInputStream zip = new ZipInputStream(inZip)) {
+
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                File unzippedFile = new File(outDir, entry.getName());
+                FileOutputStream outputStream = new FileOutputStream(unzippedFile);
+                outputStream.write(zip.readAllBytes());
+                outputStream.flush();
+                outputStream.close();
+                zip.closeEntry();
+                unzipped.add(unzippedFile);
+            }
+
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+        }
+
+        return unzipped;
+    }
+
+    private static GameProgress openProgress(File gameProgress) {
+        try (
+                FileInputStream inputStream = new FileInputStream(gameProgress);
+                ObjectInputStream inputObject = new ObjectInputStream(inputStream)) {
+
+            return (GameProgress) inputObject.readObject();
+
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println(e.getMessage());
+        }
+
+        return null;
     }
 }
