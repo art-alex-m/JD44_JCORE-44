@@ -27,6 +27,7 @@ public class Logger {
     }
 
     public void flush() {
+        /// возможно тут интереснее было бы реализовать через BufferedWriter
         try (FileOutputStream outputStream = new FileOutputStream(this.resource, true)) {
             outputStream.write(this.buffer.toString().getBytes());
             outputStream.flush();

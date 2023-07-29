@@ -1,5 +1,5 @@
 import java.io.*;
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -72,7 +72,7 @@ public class Main {
     }
 
     private static List<File> openZip(File zipFile, File outDir) {
-        List<File> unzipped = new ArrayList<>();
+        List<File> unzipped = new LinkedList<>();
         try (
                 FileInputStream inZip = new FileInputStream(zipFile);
                 ZipInputStream zip = new ZipInputStream(inZip)) {
