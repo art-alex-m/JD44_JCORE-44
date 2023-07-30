@@ -3,6 +3,7 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 data.json
+data2.json
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
