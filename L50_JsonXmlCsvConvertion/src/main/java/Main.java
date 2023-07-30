@@ -1,5 +1,6 @@
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import com.opencsv.CSVReader;
 import com.opencsv.bean.ColumnPositionMappingStrategy;
 import com.opencsv.bean.CsvToBean;
@@ -13,11 +14,15 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class Main {
     public static void main(String[] args) {
@@ -30,6 +35,15 @@ public class Main {
         /// 2. XML -> JSON
         employeeList = parseXml("data.xml");
         createAndWriteJsonToFile(employeeList, "data2.json");
+
+        /// 3. JSON parser
+        String json = readString("data.json");
+        Optional<List<Employee>> employees = jsonToList(json);
+        employees.ifPresentOrElse(
+                list -> list.forEach(System.out::println),
+                () -> System.out.println("Empty result of parsing resource file")
+        );
+        System.out.println("Parsing from json is done");
     }
 
     private static void createAndWriteJsonToFile(List<Employee> employeeList, String outJsonFileName) {
@@ -39,7 +53,7 @@ public class Main {
             return;
         }
         String employeeJson = listToJson(employeeList);
-        System.out.println(employeeJson);
+        System.out.println(employeeJson.replaceAll("[\\n\\s+]", ""));
         if (writeString(outJsonFileName, employeeJson)) {
             System.out.printf("Write employee list to %s successful%n", outJsonFileName);
         } else {
@@ -59,7 +73,7 @@ public class Main {
 
     private static String listToJson(List<Employee> employees) {
         // return new GsonBuilder().create().toJson(employees);
-        Gson gson = new GsonBuilder().create();
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
         return gson.toJson(employees);
     }
 
@@ -119,5 +133,35 @@ public class Main {
             }
         }
         return employee;
+    }
+
+    private static String readString(String inputFileName) {
+
+//        try (BufferedReader buffer = new BufferedReader(new FileReader(inputFileName))) {
+//            return buffer.lines().reduce("", String::concat);
+//        } catch (IOException e) {
+//            System.out.println(e.getMessage());
+//        }
+//        return null;
+
+        /// Такой вариант видиться компактнее для маленьких файлов
+        try (FileInputStream inputStream = new FileInputStream(inputFileName)) {
+            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+        }
+        return null;
+    }
+
+    private static Optional<List<Employee>> jsonToList(String json) {
+        if (json == null || json.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Gson builder = new GsonBuilder().create();
+        Type employeeListType = new TypeToken<List<Employee>>(){}.getType();
+        List<Employee> employeeList = builder.fromJson(json, employeeListType);
+
+        return Optional.of(employeeList);
     }
 }
