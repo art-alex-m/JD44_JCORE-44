@@ -14,10 +14,7 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -29,21 +26,48 @@ public class Main {
         List<Employee> employeeList;
         /// 1. CSV -> JSON
         String[] positionColumnCsvMap = {"id", "firstName", "lastName", "country", "age"};
-        employeeList = parseCsv("data.csv", positionColumnCsvMap);
-        createAndWriteJsonToFile(employeeList, "data.json");
+        employeeList = parseCsv(getFileFromResources("/data/data.csv"), positionColumnCsvMap);
+        createAndWriteJsonToFile(employeeList, "data1.json");
 
         /// 2. XML -> JSON
-        employeeList = parseXml("data.xml");
+        employeeList = parseXml(getFileFromResources("/data/data.xml"));
         createAndWriteJsonToFile(employeeList, "data2.json");
 
         /// 3. JSON parser
-        String json = readString("data.json");
+        String json = readString("data1.json");
         Optional<List<Employee>> employees = jsonToList(json);
         employees.ifPresentOrElse(
                 list -> list.forEach(System.out::println),
                 () -> System.out.println("Empty result of parsing resource file")
         );
         System.out.println("Parsing from json is done");
+    }
+
+    private static InputStream getDataResource(String fileName) {
+        try {
+            return Main.class.getResourceAsStream(fileName);
+        } catch (NullPointerException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static File getFileFromResources(String resourceFileName) {
+        File tempFile;
+        try {
+            tempFile = File.createTempFile("temp", null);
+            tempFile.deleteOnExit();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+            fileOutputStream.write(getDataResource(resourceFileName).readAllBytes());
+            fileOutputStream.flush();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return tempFile;
     }
 
     private static void createAndWriteJsonToFile(List<Employee> employeeList, String outJsonFileName) {
@@ -77,28 +101,27 @@ public class Main {
         return gson.toJson(employees);
     }
 
-    private static List<Employee> parseCsv(String inputCsvFileName, String[] positionColumnCsvMap) {
+    private static List<Employee> parseCsv(File inputCsvFile, String[] positionColumnCsvMap) {
         ColumnPositionMappingStrategy<Employee> mappingStrategy = new ColumnPositionMappingStrategy<>();
         mappingStrategy.setType(Employee.class);
         mappingStrategy.setColumnMapping(positionColumnCsvMap);
 
-        try (CSVReader csvReader = new CSVReader(new FileReader(inputCsvFileName))) {
+        try (FileReader fileReader = new FileReader(inputCsvFile);
+                CSVReader csvReader = new CSVReader(fileReader)) {
             CsvToBean<Employee> csvToEmployee = new CsvToBeanBuilder<Employee>(csvReader)
                     .withMappingStrategy(mappingStrategy)
                     .build();
 
             return csvToEmployee.parse();
         } catch (IOException e) {
-            System.out.println(e.getMessage());
+            throw new RuntimeException(e);
         }
-
-        return null;
     }
 
-    private static List<Employee> parseXml(String inputXmlFileName) {
+    private static List<Employee> parseXml(File inputXmlFile) {
         try {
             DocumentBuilder xmlBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-            Document doc = xmlBuilder.parse(inputXmlFileName);
+            Document doc = xmlBuilder.parse(inputXmlFile);
 
             NodeList staffList = doc.getElementsByTagName("employee");
             List<Employee> employeeList = new ArrayList<>(8);
@@ -120,16 +143,17 @@ public class Main {
         NodeList fieldsList = node.getChildNodes();
         for (int j = 0; j < fieldsList.getLength(); j++) {
             Node fieldNode = fieldsList.item(j);
-            if (fieldNode.getNodeType() == Element.ELEMENT_NODE) {
-                Element element = (Element) fieldNode;
-                String context = element.getTextContent();
-                switch (element.getTagName()) {
-                    case "id" -> employee.setId(Long.parseLong(context));
-                    case "firstName" -> employee.setFirstName(context);
-                    case "lastName" -> employee.setLastName(context);
-                    case "country" -> employee.setCountry(context);
-                    case "age" -> employee.setAge(Integer.parseInt(context));
-                }
+            if (fieldNode.getNodeType() != Element.ELEMENT_NODE) {
+                continue;
+            }
+            Element element = (Element) fieldNode;
+            String context = element.getTextContent();
+            switch (element.getTagName()) {
+                case "id" -> employee.setId(Long.parseLong(context));
+                case "firstName" -> employee.setFirstName(context);
+                case "lastName" -> employee.setLastName(context);
+                case "country" -> employee.setCountry(context);
+                case "age" -> employee.setAge(Integer.parseInt(context));
             }
         }
         return employee;
